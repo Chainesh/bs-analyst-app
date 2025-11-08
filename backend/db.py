@@ -7,6 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     DateTime,
     Text,
+    Index,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
@@ -58,3 +59,7 @@ class DocumentChunk(Base):
     chunk_index = Column(Integer)
     text = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_fulltext_text', 'text', mysql_prefix='FULLTEXT'),
+    )

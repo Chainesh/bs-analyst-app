@@ -64,7 +64,7 @@ def seed_admin(db: Session = Depends(get_db)):
         return {"message": "admin already exists", "id": existing.id}
     user = User(username="admin", password="admin", role="group_admin")
     db.add(user)
-    db.commit()              # ✅ ensure commit happens
+    db.commit()
     db.refresh(user)
     return {"message": "admin created", "id": user.id}
 
@@ -117,6 +117,48 @@ def user_has_company_access(user: User, company_id: int, db: Session) -> bool:
         .first()
     )
     return row is not None
+
+
+# ------------------
+# USER MANAGEMENT (NEW)
+# ------------------
+@app.post("/users")
+def create_user(
+    username: str,
+    password: str,
+    role: str,
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    # only admin can create users
+    if current.role != "group_admin":
+        raise HTTPException(status_code=403, detail="Only admin can create users")
+    
+    if role not in ["group_admin", "analyst", "ceo"]:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    
+    existing = db.query(User).filter(User.username == username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    user = User(username=username, password=password, role=role)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {"id": user.id, "username": user.username, "role": user.role}
+
+
+@app.get("/users")
+def list_users(
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+):
+    # only admin can list users
+    if current.role != "group_admin":
+        raise HTTPException(status_code=403, detail="Only admin can list users")
+    
+    users = db.query(User).all()
+    return [{"id": u.id, "username": u.username, "role": u.role} for u in users]
 
 
 # ------------------
@@ -189,6 +231,52 @@ def grant_access(
     db.add(uca)
     db.commit()
     return {"message": "granted"}
+
+
+# ------------------
+# DOCUMENT MANAGEMENT (NEW)
+# ------------------
+@app.get("/documents")
+def list_documents(
+    company_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    # access check
+    if not user_has_company_access(user, company_id, db):
+        raise HTTPException(status_code=403, detail="Not allowed for this company")
+    
+    docs = db.query(Document).filter(Document.company_id == company_id).all()
+    return [
+        {
+            "id": d.id,
+            "filename": d.filename,
+            "size_kb": d.size_kb,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+        }
+        for d in docs
+    ]
+
+
+@app.delete("/documents/{document_id}")
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # access check
+    if not user_has_company_access(user, doc.company_id, db):
+        raise HTTPException(status_code=403, detail="Not allowed for this company")
+    
+    # delete chunks first
+    db.query(DocumentChunk).filter(DocumentChunk.document_id == document_id).delete()
+    db.delete(doc)
+    db.commit()
+    return {"message": "deleted"}
 
 
 # ------------------
