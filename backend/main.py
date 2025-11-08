@@ -7,6 +7,13 @@ from datetime import datetime
 import io
 import os
 import pdfplumber
+from google.generativeai import GenerativeModel
+from dotenv import load_dotenv
+import os
+import google.generativeai as genai
+
+load_dotenv()
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 from db import (
     Base,
@@ -282,6 +289,33 @@ def redact_other_companies(db: Session, allowed_company_id: int, text: str) -> s
     return redacted
 
 
+def call_gemini_with_context(question: str, context: str) -> str:
+    """
+    Uses Google Gemini to generate a final answer from retrieved context.
+    If it fails, we'll just return a simple fallback.
+    """
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = f"""
+You are a financial analysis assistant.
+
+Use ONLY the context below to answer the user's question.
+If the answer is not clearly present, say:
+"Information not available in the provided documents."
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:
+"""
+        resp = model.generate_content(prompt)
+        return resp.text
+    except Exception as e:
+        print("Gemini error:", e)
+        return None
+
 @app.post("/ask")
 def ask(
     question: str,
@@ -289,11 +323,11 @@ def ask(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    # access check
+    # 1) access check
     if not user_has_company_access(user, company_id, db):
         raise HTTPException(status_code=403, detail="Not allowed for this company")
 
-    # MySQL FULLTEXT search
+    # 2) MySQL FULLTEXT search
     sql = sql_text(
         """
         SELECT id, text
@@ -318,14 +352,30 @@ def ask(
         if not fallback:
             raise HTTPException(status_code=404, detail="No chunks for this company")
         context = "\n\n---\n\n".join([f.text for f in fallback])
+        chunks_used = len(fallback)
     else:
         context = "\n\n---\n\n".join([r.text for r in rows])
+        chunks_used = len(rows)
 
-    # Responsible AI: redact other company names
+    # 3) Responsible AI: redact other company names
     context = redact_other_companies(db, company_id, context)
 
+    # 4) If we have a Gemini key, ask Gemini to produce a nicer answer
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        final_answer = call_gemini_with_context(question, context)
+        if final_answer:
+            return {
+                "answer": final_answer,
+                "context": context,
+                "chunks_used": chunks_used,
+                "llm": "gemini-1.5-flash",
+            }
+
+    # 5) fallback to old behavior if no key or Gemini failed
     return {
         "answer": f"Here are the most relevant sections for: '{question}'",
         "context": context,
-        "chunks_used": len(rows) if rows else 5,
+        "chunks_used": chunks_used,
+        "llm": "none",
     }
