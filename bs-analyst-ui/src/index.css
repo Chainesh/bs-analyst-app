@@ -1,0 +1,279 @@
+* {
+    box-sizing: border-box;
+  }
+  
+  :root {
+    --bg: #0f172a;
+    --surface: #ffffff;
+    --muted: #94a3b8;
+    --border: #e2e8f0;
+    --radius-lg: 1rem;
+    --radius-md: 0.75rem;
+    --blue: #2563eb;
+    --blue-dark: #1d4ed8;
+    --green: #22c55e;
+    --danger: #ef4444;
+    --page: #f1f5f9;
+    --code: #0f172a;
+  }
+  
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: #0f172a;
+    min-height: 100vh;
+  }
+    
+  .app-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .topbar {
+    background: #ffffffaa;
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+    padding: 0.85rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  
+  .topbar h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  
+  .user-block {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .user-block span {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  
+  .user-block button {
+    border: none;
+    background: #e2e8f0;
+    color: #0f172a;
+    padding: 0.35rem 0.8rem;
+    border-radius: 9999px;
+    cursor: pointer;
+    font-size: 0.7rem;
+  }
+  
+  .user-block button:hover {
+    background: #cbd5e1;
+  }
+  
+  .welcome-toast {
+    background: rgba(34, 197, 94, 0.12);
+    color: #166534;
+    padding: 0.2rem 0.7rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+  }
+  
+  /* ===== Main layout ===== */
+  
+  .main-grid {
+    display: grid;
+    grid-template-columns: 0.9fr 1.1fr;
+    gap: 1.25rem;
+    padding: 1.25rem 1.5rem 2.5rem;
+  }
+  
+  .left-pane,
+  .right-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .left-pane h2,
+  .right-pane h2 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.1rem;
+  }
+  
+  /* ===== Cards ===== */
+  .card {
+    background: var(--surface);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1rem 1.1rem;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.01);
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+  
+  .card h3 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: #0f172a;
+  }
+  
+  input,
+  select,
+  textarea {
+    border: 1px solid rgba(148, 163, 184, 0.5);
+    border-radius: 0.65rem;
+    padding: 0.5rem 0.55rem;
+    font-size: 0.78rem;
+    background: #ffffff;
+    transition: border 0.12s ease;
+  }
+  
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    border: 1px solid rgba(37, 99, 235, 0.55);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+  }
+  
+  textarea {
+    resize: vertical;
+    min-height: 90px;
+  }
+  
+  /* ===== Buttons ===== */
+  
+  button {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 0.6rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.12s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  
+  button:hover {
+    background: var(--blue-dark);
+  }
+  
+  /* ===== Login layout ===== */
+  
+  .login-box {
+    max-width: 360px;
+    margin: 4.5rem auto 0;
+    background: #ffffff;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 1rem;
+    padding: 1.5rem 1.4rem 1.3rem;
+    box-shadow: 0 10px 38px rgba(15, 23, 42, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  
+  .login-box h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  
+  .login-box form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  
+  .login-box input {
+    width: 100%;
+  }
+  
+  .login-box button {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .login-box p {
+    font-size: 0.7rem;
+    color: #64748b;
+  }
+  
+  /* ===== Status / answer panels ===== */
+  
+  .status {
+    font-size: 0.7rem;
+    color: #475569;
+  }
+  
+  .answer-block,
+  .context-block {
+    background: #f8fafc;
+    border: 1px solid rgba(148, 163, 184, 0.08);
+    border-radius: 0.65rem;
+    padding: 0.6rem 0.7rem;
+  }
+  
+  .answer-block h3,
+  .context-block h3 {
+    margin-top: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+  }
+  
+  .context-block pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 0.5rem 0.6rem;
+    border-radius: 0.5rem;
+    font-size: 0.7rem;
+    max-height: 240px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  
+  .answer-block p {
+    margin: 0;
+    font-size: 0.78rem;
+  }
+  
+  /* ===== Responsive ===== */
+  
+  @media (max-width: 1024px) {
+    .main-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  @media (max-width: 600px) {
+    .topbar {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.4rem;
+    }
+    .login-box {
+      margin-top: 3.5rem;
+    }
+  }
+  
