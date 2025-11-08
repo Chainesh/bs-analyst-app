@@ -3,116 +3,114 @@ import React, { useState, useEffect } from "react";
 export default function AdminPanel({ apiBase, token }) {
   const [users, setUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
-  
-  // Create user form
+  const [message, setMessage] = useState("");
+
+  // New user form
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("analyst");
-  
-  // Create company form
-  const [newCompanyName, setNewCompanyName] = useState("");
-  
+
+  // New company form
+  const [newCompany, setNewCompany] = useState("");
+
   // Grant access form
-  const [selectedUserId, setSelectedUserId] = useState("");
-  const [selectedCompanyId, setSelectedCompanyId] = useState("");
-  
-  const [message, setMessage] = useState("");
+  const [grantUserId, setGrantUserId] = useState("");
+  const [grantCompanyId, setGrantCompanyId] = useState("");
 
   useEffect(() => {
-    fetchUsers();
-    fetchCompanies();
+    loadUsers();
+    loadCompanies();
   }, []);
 
-  const fetchUsers = () => {
+  function loadUsers() {
     fetch(`${apiBase}/users`, {
       headers: { "X-Token": token },
     })
       .then((r) => r.json())
       .then(setUsers)
-      .catch(() => setUsers([]));
-  };
+      .catch(console.error);
+  }
 
-  const fetchCompanies = () => {
+  function loadCompanies() {
     fetch(`${apiBase}/companies`, {
       headers: { "X-Token": token },
     })
       .then((r) => r.json())
       .then(setCompanies)
-      .catch(() => setCompanies([]));
-  };
+      .catch(console.error);
+  }
 
-  const handleCreateUser = (e) => {
+  async function handleCreateUser(e) {
     e.preventDefault();
-    const formData = new URLSearchParams();
-    formData.append("username", newUsername);
-    formData.append("password", newPassword);
-    formData.append("role", newRole);
-
-    fetch(`${apiBase}/users`, {
-      method: "POST",
-      headers: {
-        "X-Token": token,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: formData,
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        setMessage(`User created: ${data.username}`);
+    const params = new URLSearchParams({
+      username: newUsername,
+      password: newPassword,
+      role: newRole,
+    });
+    try {
+      const res = await fetch(`${apiBase}/users?${params}`, {
+        method: "POST",
+        headers: { "X-Token": token },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage(`User created: ${data.username} (${data.role})`);
         setNewUsername("");
         setNewPassword("");
-        fetchUsers();
-      })
-      .catch((err) => setMessage("Error creating user"));
-  };
+        setNewRole("analyst");
+        loadUsers();
+      } else {
+        setMessage(`Error: ${data.detail || "Failed to create user"}`);
+      }
+    } catch (err) {
+      setMessage(`Error: ${err.message}`);
+    }
+  }
 
-  const handleCreateCompany = (e) => {
+  async function handleCreateCompany(e) {
     e.preventDefault();
-    const formData = new URLSearchParams();
-    formData.append("name", newCompanyName);
+    const params = new URLSearchParams({ name: newCompany });
+    try {
+      const res = await fetch(`${apiBase}/companies?${params}`, {
+        method: "POST",
+        headers: { "X-Token": token },
+      });
+      const data = await res.json();
+      setMessage(data.message === "created" 
+        ? `Company created: ${data.name}` 
+        : `Company already exists: ${data.name}`);
+      setNewCompany("");
+      loadCompanies();
+    } catch (err) {
+      setMessage(`Error: ${err.message}`);
+    }
+  }
 
-    fetch(`${apiBase}/companies`, {
-      method: "POST",
-      headers: {
-        "X-Token": token,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: formData,
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        setMessage(`Company created: ${data.name}`);
-        setNewCompanyName("");
-        fetchCompanies();
-      })
-      .catch((err) => setMessage("Error creating company"));
-  };
-
-  const handleGrantAccess = (e) => {
+  async function handleGrantAccess(e) {
     e.preventDefault();
-    const formData = new URLSearchParams();
-    formData.append("user_id", selectedUserId);
-    formData.append("company_id", selectedCompanyId);
-
-    fetch(`${apiBase}/grant-access`, {
-      method: "POST",
-      headers: {
-        "X-Token": token,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: formData,
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        setMessage(data.message);
-      })
-      .catch((err) => setMessage("Error granting access"));
-  };
+    const params = new URLSearchParams({
+      user_id: grantUserId,
+      company_id: grantCompanyId,
+    });
+    try {
+      const res = await fetch(`${apiBase}/grant-access?${params}`, {
+        method: "POST",
+        headers: { "X-Token": token },
+      });
+      const data = await res.json();
+      setMessage(data.message === "granted" 
+        ? "Access granted successfully" 
+        : "User already has access");
+      setGrantUserId("");
+      setGrantCompanyId("");
+    } catch (err) {
+      setMessage(`Error: ${err.message}`);
+    }
+  }
 
   return (
     <div className="admin-panel">
       <h2>Admin Panel</h2>
-      
       {message && <div className="message">{message}</div>}
 
       <div className="admin-grid">
@@ -123,9 +121,11 @@ export default function AdminPanel({ apiBase, token }) {
             <label>
               Username
               <input
+                type="text"
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value)}
                 required
+                placeholder="Enter username"
               />
             </label>
             <label>
@@ -135,6 +135,7 @@ export default function AdminPanel({ apiBase, token }) {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
+                placeholder="Enter password"
               />
             </label>
             <label>
@@ -156,9 +157,11 @@ export default function AdminPanel({ apiBase, token }) {
             <label>
               Company Name
               <input
-                value={newCompanyName}
-                onChange={(e) => setNewCompanyName(e.target.value)}
+                type="text"
+                value={newCompany}
+                onChange={(e) => setNewCompany(e.target.value)}
                 required
+                placeholder="Enter company name"
               />
             </label>
             <button type="submit">Create Company</button>
@@ -172,8 +175,8 @@ export default function AdminPanel({ apiBase, token }) {
             <label>
               User
               <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
+                value={grantUserId}
+                onChange={(e) => setGrantUserId(e.target.value)}
                 required
               >
                 <option value="">Select User</option>
@@ -187,8 +190,8 @@ export default function AdminPanel({ apiBase, token }) {
             <label>
               Company
               <select
-                value={selectedCompanyId}
-                onChange={(e) => setSelectedCompanyId(e.target.value)}
+                value={grantCompanyId}
+                onChange={(e) => setGrantCompanyId(e.target.value)}
                 required
               >
                 <option value="">Select Company</option>
@@ -202,14 +205,19 @@ export default function AdminPanel({ apiBase, token }) {
             <button type="submit">Grant Access</button>
           </form>
         </div>
+      </div>
 
+      {/* Lists */}
+      <div className="admin-grid" style={{ marginTop: "1.5rem" }}>
         {/* Users List */}
         <div className="card">
-          <h3>Users ({users.length})</h3>
+          <h3>All Users</h3>
           <div className="list">
             {users.map((u) => (
               <div key={u.id} className="list-item">
-                <strong>{u.username}</strong>
+                <span>
+                  <strong>{u.username}</strong>
+                </span>
                 <span className="badge">{u.role}</span>
               </div>
             ))}
@@ -218,11 +226,11 @@ export default function AdminPanel({ apiBase, token }) {
 
         {/* Companies List */}
         <div className="card">
-          <h3>Companies ({companies.length})</h3>
+          <h3>All Companies</h3>
           <div className="list">
             {companies.map((c) => (
               <div key={c.id} className="list-item">
-                {c.name}
+                <span>{c.name}</span>
               </div>
             ))}
           </div>

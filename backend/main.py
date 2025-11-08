@@ -12,8 +12,24 @@ from dotenv import load_dotenv
 import os
 import google.generativeai as genai
 
+from dotenv import load_dotenv
+import os
+import google.generativeai as genai
+
+# Load environment variables
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# Get and configure API key
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Debug: Check if key is loaded
+if GEMINI_API_KEY:
+    print(f"✓ Gemini API key loaded: {GEMINI_API_KEY[:10]}...")
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    print("✗ WARNING: GEMINI_API_KEY not found in environment!")
+    print("  Create a .env file with: GEMINI_API_KEY=your_key_here")
+
 
 from db import (
     Base,
@@ -30,6 +46,15 @@ app = FastAPI(title="Balance Sheet Analyst API")
 
 # create tables
 Base.metadata.create_all(bind=engine)
+
+# Also add a health check endpoint to verify:
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "gemini_configured": GEMINI_API_KEY is not None,
+        "gemini_key_preview": GEMINI_API_KEY[:10] + "..." if GEMINI_API_KEY else None
+    }
 
 # allow React (Vite runs on 5173 by default)
 app.add_middleware(
@@ -377,33 +402,80 @@ def redact_other_companies(db: Session, allowed_company_id: int, text: str) -> s
     return redacted
 
 
-def call_gemini_with_context(question: str, context: str) -> str:
+def call_gemini_with_context(question: str, context: str) -> dict:
     """
     Uses Google Gemini to generate a final answer from retrieved context.
-    If it fails, we'll just return a simple fallback.
+    Returns dict with 'answer' and optional 'error'
     """
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt = f"""
-You are a financial analysis assistant.
+        if not GEMINI_API_KEY:
+            return {
+                "error": "Gemini API key not configured",
+                "answer": None
+            }
+        
+        # Try different model names in order of preference
+        model_names = [
+            "models/gemini-2.5-flash",
+            "gemini-1.5-flash",
+            "gemini-pro",
+            "gemini-1.0-pro",
+        ]
+        
+        model = None
+        used_model = None
+        
+        for model_name in model_names:
+            try:
+                model = genai.GenerativeModel(model_name)
+                used_model = model_name
+                break
+            except Exception as e:
+                print(f"Failed to load {model_name}: {e}")
+                continue
+        
+        if not model:
+            return {
+                "error": "No available Gemini models found",
+                "answer": None
+            }
+        
+        prompt = f"""You are a financial analysis assistant.
 
 Use ONLY the context below to answer the user's question.
-If the answer is not clearly present, say:
-"Information not available in the provided documents."
+If the answer is not clearly present, say: "Information not available in the provided documents."
 
 Context:
 {context}
 
 Question: {question}
 
-Answer:
-"""
-        resp = model.generate_content(prompt)
-        return resp.text
+Answer:"""
+        
+        # Generate content with timeout and error handling
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                max_output_tokens=800,
+                temperature=0.2,
+            )
+        )
+        
+        return {
+            "answer": response.text,
+            "error": None,
+            "model_used": used_model
+        }
+        
     except Exception as e:
-        print("Gemini error:", e)
-        return None
+        error_msg = str(e)
+        print(f"Gemini error: {error_msg}")
+        return {
+            "error": error_msg,
+            "answer": None
+        }
 
+# Update the /ask endpoint to use the new response format:
 @app.post("/ask")
 def ask(
     question: str,
@@ -448,22 +520,68 @@ def ask(
     # 3) Responsible AI: redact other company names
     context = redact_other_companies(db, company_id, context)
 
-    # 4) If we have a Gemini key, ask Gemini to produce a nicer answer
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if gemini_key:
-        final_answer = call_gemini_with_context(question, context)
-        if final_answer:
-            return {
-                "answer": final_answer,
-                "context": context,
-                "chunks_used": chunks_used,
-                "llm": "gemini-1.5-flash",
-            }
-
-    # 5) fallback to old behavior if no key or Gemini failed
+    # 4) Try Gemini
+    gemini_result = call_gemini_with_context(question, context)
+    
+    if gemini_result.get("answer"):
+        return {
+            "answer": gemini_result["answer"],
+            "context": context,
+            "chunks_used": chunks_used,
+            "llm": gemini_result.get("model_used", "gemini"),
+        }
+    
+    # 5) Fallback
     return {
         "answer": f"Here are the most relevant sections for: '{question}'",
         "context": context,
         "chunks_used": chunks_used,
         "llm": "none",
+        "error": gemini_result.get("error")
+    }
+
+# Add this endpoint to backend/main.py to diagnose Gemini issues
+
+@app.get("/gemini-status")
+def gemini_status():
+    """
+    Diagnostic endpoint to check Gemini API status and available models
+    """
+    if not GEMINI_API_KEY:
+        return {
+            "configured": False,
+            "error": "GEMINI_API_KEY environment variable not set",
+            "models": []
+        }
+    
+    try:
+        # List available models
+        available_models = []
+        for model in genai.list_models():
+            if 'generateContent' in model.supported_generation_methods:
+                available_models.append({
+                    "name": model.name,
+                    "display_name": model.display_name,
+                    "description": model.description[:100] if model.description else ""
+                })
+        
+        return {
+            "configured": True,
+            "api_key_preview": GEMINI_API_KEY[:10] + "..." if GEMINI_API_KEY else None,
+            "available_models": available_models,
+            "recommended_model": available_models[0]["name"] if available_models else None
+        }
+    except Exception as e:
+        return {
+            "configured": True,
+            "error": str(e),
+            "models": []
+        }
+
+# Update the health endpoint too:
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "gemini_configured": GEMINI_API_KEY is not None,
     }

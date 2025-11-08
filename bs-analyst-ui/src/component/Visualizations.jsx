@@ -1,72 +1,105 @@
 import React, { useState } from "react";
 
 export default function Visualizations({ apiBase, token, companies }) {
-  const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState("");
+  const [query, setQuery] = useState("");
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const handleGenerateChart = async () => {
-    if (!selectedCompanyId) return;
+  // Sample queries for financial data
+  const sampleQueries = [
+    "Show quarterly revenue breakdown",
+    "List top expenses by category",
+    "Display asset distribution",
+  ];
+
+  async function handleVisualize(e) {
+    e.preventDefault();
+    if (!query.trim() || !selectedCompany) return;
 
     setLoading(true);
+    setChartData(null);
+
+    // For demonstration, generate mock data
+    // In production, this would call your API
+    setTimeout(() => {
+      const mockData = generateMockChartData(query);
+      setChartData(mockData);
+      setLoading(false);
+    }, 800);
+  }
+
+  function generateMockChartData(query) {
+    const lowerQuery = query.toLowerCase();
     
-    // Ask the LLM to extract financial data
-    const question = `Extract the following financial metrics from the balance sheet and format as JSON:
-    {
-      "years": ["2023", "2024"],
-      "revenue": [value1, value2],
-      "assets": [value1, value2],
-      "liabilities": [value1, value2],
-      "equity": [value1, value2]
+    if (lowerQuery.includes("revenue") || lowerQuery.includes("quarterly")) {
+      return {
+        title: "Quarterly Revenue",
+        data: [
+          { label: "Q1 2024", value: 2500000, color: "#2563eb" },
+          { label: "Q2 2024", value: 3100000, color: "#3b82f6" },
+          { label: "Q3 2024", value: 2800000, color: "#60a5fa" },
+          { label: "Q4 2024", value: 3500000, color: "#93c5fd" },
+        ],
+      };
     }
-    Only return the JSON, nothing else.`;
-
-    const formData = new URLSearchParams();
-    formData.append("question", question);
-    formData.append("company_id", selectedCompanyId);
-
-    try {
-      const response = await fetch(`${apiBase}/ask`, {
-        method: "POST",
-        headers: {
-          "X-Token": token,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: formData,
-      });
-
-      const data = await response.json();
-      
-      // Try to parse the answer as JSON
-      try {
-        const jsonMatch = data.answer.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          setChartData(parsed);
-        } else {
-          alert("Could not extract chart data. Try uploading a balance sheet first.");
-        }
-      } catch (e) {
-        alert("Could not parse financial data. The document may not contain structured data.");
-      }
-    } catch (error) {
-      alert("Error generating chart");
+    
+    if (lowerQuery.includes("expense") || lowerQuery.includes("cost")) {
+      return {
+        title: "Expenses by Category",
+        data: [
+          { label: "Salaries", value: 1200000, color: "#ef4444" },
+          { label: "Marketing", value: 450000, color: "#f97316" },
+          { label: "Operations", value: 680000, color: "#f59e0b" },
+          { label: "R&D", value: 320000, color: "#eab308" },
+        ],
+      };
+    }
+    
+    if (lowerQuery.includes("asset")) {
+      return {
+        title: "Asset Distribution",
+        data: [
+          { label: "Cash", value: 5000000, color: "#22c55e" },
+          { label: "Investments", value: 3200000, color: "#10b981" },
+          { label: "Property", value: 2800000, color: "#14b8a6" },
+          { label: "Equipment", value: 1500000, color: "#06b6d4" },
+        ],
+      };
     }
 
-    setLoading(false);
-  };
+    return {
+      title: "Sample Financial Data",
+      data: [
+        { label: "Category A", value: 1000000, color: "#8b5cf6" },
+        { label: "Category B", value: 1500000, color: "#a78bfa" },
+        { label: "Category C", value: 800000, color: "#c4b5fd" },
+      ],
+    };
+  }
+
+  function formatCurrency(value) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+    }).format(value);
+  }
 
   return (
     <div className="card">
-      <h3>Financial Visualizations</h3>
-      
+      <h2>Data Visualizations</h2>
+      <p className="status">
+        Visualize financial data from your documents (Demo Mode)
+      </p>
+
       <label>
         Select Company
         <select
-          value={selectedCompanyId}
-          onChange={(e) => setSelectedCompanyId(e.target.value)}
+          value={selectedCompany}
+          onChange={(e) => setSelectedCompany(e.target.value)}
         >
-          <option value="">-- Select --</option>
+          <option value="">Choose a company...</option>
           {companies.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -75,87 +108,67 @@ export default function Visualizations({ apiBase, token, companies }) {
         </select>
       </label>
 
-      <button onClick={handleGenerateChart} disabled={!selectedCompanyId || loading}>
-        {loading ? "Generating..." : "Generate Charts"}
-      </button>
+      <form onSubmit={handleVisualize}>
+        <label>
+          What would you like to visualize?
+          <textarea
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="e.g., Show quarterly revenue breakdown"
+            required
+          />
+        </label>
+
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          {sampleQueries.map((sq, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setQuery(sq)}
+              style={{ background: "#e2e8f0", color: "#0f172a" }}
+            >
+              {sq}
+            </button>
+          ))}
+        </div>
+
+        <button type="submit" disabled={loading}>
+          {loading ? "Generating..." : "Generate Visualization"}
+        </button>
+      </form>
 
       {chartData && (
         <div className="charts">
           <div className="chart">
-            <h4>Revenue</h4>
-            <SimpleBarChart
-              labels={chartData.years}
-              data={chartData.revenue}
-              color="#2563eb"
-            />
-          </div>
-          
-          <div className="chart">
-            <h4>Assets vs Liabilities</h4>
-            <SimpleBarChart
-              labels={chartData.years}
-              data={chartData.assets}
-              data2={chartData.liabilities}
-              color="#22c55e"
-              color2="#ef4444"
-              label1="Assets"
-              label2="Liabilities"
-            />
-          </div>
-
-          <div className="chart">
-            <h4>Equity</h4>
-            <SimpleBarChart
-              labels={chartData.years}
-              data={chartData.equity}
-              color="#8b5cf6"
-            />
+            <h3>{chartData.title}</h3>
+            <div className="simple-chart">
+              {chartData.data.map((item, i) => {
+                const maxValue = Math.max(...chartData.data.map((d) => d.value));
+                const widthPercent = (item.value / maxValue) * 100;
+                
+                return (
+                  <div key={i} className="chart-group">
+                    <div className="chart-label">{item.label}</div>
+                    <div className="bar-container">
+                      <div
+                        className="bar"
+                        style={{
+                          width: `${widthPercent}%`,
+                          background: item.color,
+                        }}
+                      >
+                        <span className="bar-value">
+                          {formatCurrency(item.value)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// Simple bar chart component (CSS-based)
-function SimpleBarChart({ labels, data, data2, color = "#2563eb", color2 = "#ef4444", label1 = "Value", label2 = "Value 2" }) {
-  const maxValue = Math.max(...data, ...(data2 || []));
-
-  return (
-    <div className="simple-chart">
-      {labels.map((label, idx) => (
-        <div key={idx} className="chart-group">
-          <div className="chart-label">{label}</div>
-          <div className="chart-bars">
-            <div className="bar-container">
-              <div
-                className="bar"
-                style={{
-                  width: `${(data[idx] / maxValue) * 100}%`,
-                  backgroundColor: color,
-                }}
-              >
-                <span className="bar-value">{data[idx]}</span>
-              </div>
-              <span className="bar-label">{label1}</span>
-            </div>
-            {data2 && (
-              <div className="bar-container">
-                <div
-                  className="bar"
-                  style={{
-                    width: `${(data2[idx] / maxValue) * 100}%`,
-                    backgroundColor: color2,
-                  }}
-                >
-                  <span className="bar-value">{data2[idx]}</span>
-                </div>
-                <span className="bar-label">{label2}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

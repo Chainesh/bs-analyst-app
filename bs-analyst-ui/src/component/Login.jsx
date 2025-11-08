@@ -1,50 +1,75 @@
 import React, { useState } from "react";
 
 export default function Login({ onLogin, apiBase }) {
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin");
-  const [message, setMessage] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
-    setMessage("Logging in...");
+    setError("");
+    setLoading(true);
+
+    const params = new URLSearchParams({ username, password });
 
     try {
-      const res = await fetch(`${apiBase}/login?username=${username}&password=${password}`, {
+      const res = await fetch(`${apiBase}/login?${params}`, {
         method: "POST",
       });
-      if (!res.ok) {
-        setMessage("❌ Invalid credentials. Please try again.");
-        return;
-      }
       const data = await res.json();
-      setMessage("✅ Welcome, " + username + "!");
-      onLogin(data.token, data.role);
+
+      if (res.ok) {
+        onLogin(data.token, data.role);
+      } else {
+        setError(data.detail || "Login failed");
+      }
     } catch (err) {
-      console.error(err);
-      setMessage("Server error. Make sure backend is running.");
+      setError(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
   return (
     <div className="login-box">
-      <h2>Login</h2>
-      <form onSubmit={handleLogin}>
-        <input
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Username"
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-        />
-        <button type="submit">Login</button>
+      <h2>Balance Sheet Analyst</h2>
+      <p>Sign in to access your financial data</p>
+
+      <form onSubmit={handleSubmit}>
+        <label>
+          Username
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter username"
+            required
+            autoFocus
+          />
+        </label>
+
+        <label>
+          Password
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter password"
+            required
+          />
+        </label>
+
+        <button type="submit" disabled={loading}>
+          {loading ? "Signing in..." : "Sign In"}
+        </button>
       </form>
-      {message && <p style={{ marginTop: "10px" }}>{message}</p>}
+
+      {error && <div className="message error">{error}</div>}
+
+      <p style={{ marginTop: "1rem", textAlign: "center" }}>
+        Default admin: <strong>admin</strong> / <strong>admin</strong>
+      </p>
     </div>
   );
 }
